@@ -6,9 +6,6 @@ const nextConfig = {
       { protocol: "https", hostname: "avatars.githubusercontent.com" },
     ],
   },
-  experimental: {
-    optimizePackageImports: ["echarts", "lucide-react"],
-  },
 };
 
 export default nextConfig;
