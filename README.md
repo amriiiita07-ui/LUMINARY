@@ -300,7 +300,7 @@ luminary/
 │   └── index.ts                  # Global TypeScript interfaces
 │
 ├── tailwind.config.ts            # Full custom design system
-├── next.config.ts
+├── next.config.mjs
 ├── tsconfig.json
 ├── .env.example                  # All required environment variables
 └── README.md
