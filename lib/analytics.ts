@@ -25,59 +25,68 @@ export async function getCityKPIs() {
 
   const today     = mobilityToday._avg.mobilityScore     ?? 0;
   const yesterday = mobilityYesterday._avg.mobilityScore ?? 1;
-  const delta     = ((today - yesterday) / yesterday) * 100;
+  const delta     = yesterday > 0 ? ((today - yesterday) / yesterday) * 100 : 0;
 
   return {
-    mobilityIndex:    Math.round(today * 10) / 10,
-    mobilityDelta:    Math.round(delta * 10) / 10,
+    mobilityIndex:  Math.round(today * 10) / 10,
+    mobilityDelta:  Math.round(delta * 10) / 10,
     openAnomalies,
-    criticalAlerts:   criticalAnomalies,
-    zonesMonitored:   zoneCount,
-    computedAt:       new Date().toISOString(),
+    criticalAlerts: criticalAnomalies,
+    zonesMonitored: zoneCount,
+    computedAt:     new Date().toISOString(),
   };
 }
 
 // ── Zone Risk List ─────────────────────────────────────────────
 export async function getZoneRisk() {
-  const snapshots = await db.riskSnapshot.findMany({
-    where: {
-      snapshotDate: {
-        gte: new Date(new Date().setHours(0, 0, 0, 0)),
+  // Get the most recent snapshot per zone (avoids timezone issues with "today")
+  const zones = await db.zone.findMany({
+    include: {
+      district: true,
+      riskSnapshots: {
+        orderBy: { snapshotDate: "desc" },
+        take: 1,
       },
     },
-    include: { zone: { include: { district: true } } },
-    orderBy: { riskScore: "desc" },
-    take: 20,
+    orderBy: { name: "asc" },
   });
 
-  return snapshots.map((s, i) => ({
-    zoneId:        s.zoneId,
-    zoneName:      s.zone.name,
-    zoneCode:      s.zone.code,
-    district:      s.zone.district.name,
-    lat:           s.zone.lat,
-    lng:           s.zone.lng,
-    riskScore:     s.riskScore,
-    riskTier:      s.riskTier,
-    riskRank:      i + 1,
-    weeklyDrift:   s.weeklyDriftPct,
-    anomalyCount:  s.anomalyCount,
-    avgMobility:   s.avgMobility,
-  }));
+  const withRisk = zones
+    .filter((z) => z.riskSnapshots.length > 0)
+    .map((z) => ({
+      zoneId:       z.id,
+      zoneName:     z.name,
+      zoneCode:     z.code,
+      district:     z.district.name,
+      lat:          z.lat,
+      lng:          z.lng,
+      riskScore:    Math.round(z.riskSnapshots[0].riskScore * 10) / 10,
+      riskTier:     z.riskSnapshots[0].riskTier,
+      weeklyDrift:  z.riskSnapshots[0].weeklyDriftPct,
+      anomalyCount: z.riskSnapshots[0].anomalyCount,
+      avgMobility:  Math.round(z.riskSnapshots[0].avgMobility * 10) / 10,
+    }))
+    .sort((a, b) => b.riskScore - a.riskScore)
+    .map((z, i) => ({ ...z, riskRank: i + 1 }));
+
+  return withRisk;
 }
 
 // ── 7-Day Mobility Trend ───────────────────────────────────────
 export async function getMobilityTrend(zoneId?: string) {
-  const where = {
-    recordedAt: { gte: new Date(Date.now() - 7 * 86_400_000) },
-    ...(zoneId ? { zoneId } : {}),
-  };
+  const since = new Date(Date.now() - 7 * 86_400_000);
 
-  const events = await db.mobilityEvent.groupBy({
-    by:      ["recordedAt"],
-    _avg:    { mobilityScore: true },
-    _sum:    { pedestrianCount: true, vehicularCount: true },
-    where,
+  const events = await db.mobilityEvent.findMany({
+    where: {
+      recordedAt: { gte: since },
+      ...(zoneId ? { zoneId } : {}),
+    },
+    select: {
+      recordedAt:      true,
+      mobilityScore:   true,
+      pedestrianCount: true,
+      vehicularCount:  true,
+    },
     orderBy: { recordedAt: "asc" },
   });
 
@@ -86,9 +95,9 @@ export async function getMobilityTrend(zoneId?: string) {
   for (const e of events) {
     const day = e.recordedAt.toISOString().split("T")[0];
     const existing = byDay.get(day) ?? { scores: [], peds: 0, vehs: 0 };
-    existing.scores.push(e._avg.mobilityScore ?? 0);
-    existing.peds += e._sum.pedestrianCount ?? 0;
-    existing.vehs += e._sum.vehicularCount  ?? 0;
+    existing.scores.push(e.mobilityScore);
+    existing.peds += e.pedestrianCount;
+    existing.vehs += e.vehicularCount;
     byDay.set(day, existing);
   }
 
