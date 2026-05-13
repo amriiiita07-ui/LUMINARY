@@ -14,7 +14,7 @@
 ### **Urban Intelligence Platform**
 *Transforming fragmented city data streams into predictive intelligence*
 
-<br/>
+<br/> 
 
 [![Next.mjs](https://img.shields.io/badge/Next.mjs_14-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)](https://next.mjs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
