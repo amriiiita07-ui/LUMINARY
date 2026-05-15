@@ -66,7 +66,7 @@ Built as a showcase project for data science and full-stack engineering portfoli
 
 <br/>
 
----
+---  
 
 ## ✦ Feature Showcase
 
